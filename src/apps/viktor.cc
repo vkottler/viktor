@@ -31,14 +31,18 @@ int main(void)
         /*
          * Create the event-poll interface.
          */
-        int epoll = epoll_create1(EPOLL_CLOEXEC);
-        assert(epoll != -1);
-        fds.add_fd("epoll", epoll);
+        Epoll epoll;
+
+        /*
+         * Create the terminal interface.
+         */
+        Termios term(fileno(stdin));
+        assert(fd_set_blocking_state(fileno(stdout)));
 
         /*
          * Run the application.
          */
-        ::Viktor::Viktor app(fds);
+        ::Viktor::Viktor app(fds, epoll, term);
         result = app.run();
     }
 

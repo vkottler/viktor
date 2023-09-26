@@ -14,8 +14,6 @@
 
 using namespace Viktor;
 
-using Epoll = EpollManager<>;
-
 bool echo_handler(int fd, uint32_t events)
 {
     bool result = events & EPOLLIN;
@@ -103,7 +101,7 @@ int main(void)
         initialize(term, epoll);
 
         /* no way to spoof input currently */
-        // result = app(epoll);
+        result = app(epoll);
     }
     print_verb_name_condition("app", "run", result);
     return result ? 0 : 1;

@@ -24,15 +24,16 @@ template <int max_events = 64> class EpollManager
   public:
     using EventCallback = std::function<bool(int, uint32_t)>;
 
-    EpollManager() : epoll(epoll_create1(0)), valid(true), events(), handlers()
+    EpollManager()
+        : epoll_fd(epoll_create1(0)), valid(true), events(), handlers()
     {
-        valid = epoll != -1;
+        valid = epoll_fd != -1;
         print_verb_name_condition("epoll", "create", valid);
     }
 
     ~EpollManager()
     {
-        valid = close(epoll) == 0;
+        valid = close(epoll_fd) == 0;
         print_verb_name_condition("epoll", "close", valid);
     }
 
@@ -87,8 +88,9 @@ template <int max_events = 64> class EpollManager
         return result;
     }
 
+    int epoll_fd;
+
   protected:
-    int epoll;
     bool valid;
     std::array<epoll_event, max_events> events;
     std::map<int, EventCallback> handlers;
@@ -106,7 +108,7 @@ template <int max_events = 64> class EpollManager
         if (valid)
         {
             struct epoll_event event = {.events = events, .data = {.fd = fd}};
-            result = epoll_ctl(epoll, op, fd, &event) == 0;
+            result = epoll_ctl(epoll_fd, op, fd, &event) == 0;
         }
 
         std::string fd_string = "poll fd(" + std::to_string(fd) + ")";
@@ -121,8 +123,10 @@ template <int max_events = 64> class EpollManager
 
     int wait(int timeout)
     {
-        return epoll_wait(epoll, events.data(), max_events, timeout);
+        return epoll_wait(epoll_fd, events.data(), max_events, timeout);
     }
 };
+
+using Epoll = EpollManager<>;
 
 } // namespace Viktor
