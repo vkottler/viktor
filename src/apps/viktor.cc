@@ -42,5 +42,6 @@ int main(void)
         result = app.run();
     }
 
+    print_verb_name_condition("viktor", "run", result == 0);
     return result;
 }
