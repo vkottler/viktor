@@ -71,16 +71,23 @@ template <int max_events = 64> class EpollManager
     {
         int result = wait(timeout);
 
-        for (int i = 0; i < result; i++)
+        if (result == -1)
         {
-            epoll_event &event = events[i];
-            int fd = event.data.fd;
-
-            if (handlers.contains(fd))
+            perror(__FILE__);
+        }
+        else
+        {
+            for (int i = 0; i < result; i++)
             {
-                if (!handlers[fd](fd, event.events))
+                epoll_event &event = events[i];
+                int fd = event.data.fd;
+
+                if (handlers.contains(fd))
                 {
-                    handlers.erase(fd);
+                    if (!handlers[fd](fd, event.events))
+                    {
+                        handlers.erase(fd);
+                    }
                 }
             }
         }

@@ -4,6 +4,10 @@
  */
 #pragma once
 
+/* linux */
+#include <signal.h>
+#include <sys/signalfd.h>
+
 /* toolchain */
 #include <cassert>
 
@@ -20,7 +24,8 @@ class Viktor
 {
   public:
     Viktor(FdManager &_fds, Epoll &_epoll, Termios &_terminal)
-        : echo(true), fds(_fds), epoll(_epoll), terminal(_terminal)
+        : echo(true), fds(_fds), epoll(_epoll), terminal(_terminal),
+          running(true)
     {
         /* Turn input echo and canonical mode off. */
         assert(terminal.set_echo(false));
@@ -32,16 +37,55 @@ class Viktor
             epoll.event_handler(terminal.fd, [this](int fd, uint32_t events) {
                 return input_handler(fd, events);
             }));
+
+        /* Add signal handling. */
+        sigset_t mask;
+        sigemptyset(&mask);
+        sigaddset(&mask, SIGTERM);
+        sigaddset(&mask, SIGINT);
+        int result = sigprocmask(SIG_BLOCK, &mask, 0);
+        if (result == -1)
+        {
+            perror(__FILE__);
+        }
+
+        int signal_fd = signalfd(-1, &mask, SFD_NONBLOCK);
+        if (signal_fd == -1)
+        {
+            perror(__FILE__);
+        }
+        fds.add_fd("signalfd", signal_fd);
+
+        assert(epoll.add(signal_fd, EPOLLIN));
+        assert(epoll.event_handler(signal_fd, [this](int fd, uint32_t events) {
+            return signal_handler(fd, events);
+        }));
     }
 
     int run()
     {
-        while (epoll.has_handlers())
+        while (epoll.has_handlers() and running)
         {
             epoll.run();
         }
 
         return 0;
+    }
+
+    bool signal_handler(int fd, uint32_t events)
+    {
+        assert(events & EPOLLIN);
+
+        signalfd_siginfo signal;
+        while (read(fd, &signal, sizeof(signalfd_siginfo)) ==
+               sizeof(signalfd_siginfo))
+        {
+            std::cout << "READ SIGNAL INFO" << std::endl;
+        }
+
+        running = false;
+
+        return true;
     }
 
     bool input_handler(int fd, uint32_t events)
@@ -68,7 +112,8 @@ class Viktor
             {
                 result = data != 'q';
 
-                /* refactor this to not use std::cout (need our output fd) */
+                /* refactor this to not use std::cout (need our output fd)
+                 */
                 std::cout << int(data);
                 if (iscntrl(data))
                 {
@@ -91,6 +136,7 @@ class Viktor
     FdManager &fds;
     Epoll &epoll;
     Termios &terminal;
+    bool running;
 };
 
 } // namespace Viktor
